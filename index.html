@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>互動三折頁｜按鈕翻頁＋摺線陰影（修正版 v2）</title>
+  <style>
+    :root{ --ink:#e5e7eb; --bg:#0b0c10; --panel:#0f172a; }
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,#111827,#0b0c10);font-family:ui-sans-serif,system-ui,"Noto Sans TC",-apple-system,"Segoe UI",Roboto,Helvetica,Arial;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);padding:8px 10px;border-radius:12px;backdrop-filter:blur(8px)}
+    .toolbar button{cursor:pointer;border:none;padding:10px 14px;border-radius:10px;font-weight:700;color:#0b1220;background:#f9fafb}
+    .toolbar button.secondary{background:#1f2937;color:#e5e7eb;border:1px solid #374151}
+
+    .stage{width:min(1100px,95vw);aspect-ratio:3/2;position:relative;border-radius:16px;overflow:hidden;background:#0f172a;box-shadow:0 30px 80px rgba(0,0,0,.45),inset 0 0 0 1px rgba(255,255,255,.06);}
+    .brochure{position:absolute;inset:0;display:flex}
+
+    .panel{flex:1 1 33.333%;position:relative;opacity:1;transition:opacity 380ms ease;z-index:1}
+    .panel.left{z-index:3}
+    .panel.center{z-index:2}
+    .panel.right{z-index:1}
+    .hidden{opacity:0;pointer-events:none}
+
+    .page{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);overflow:hidden;box-shadow:inset 0 0 30px rgba(0,0,0,.45)}
+    .page img{width:100%;height:100%;object-fit:contain;display:block}
+
+    /* 強烈摺線陰影 */
+    .crease{position:absolute;top:0;bottom:0;width:14px;pointer-events:none}
+    .crease.left{left:33.333%}
+    .crease.right{left:66.666%}
+    .crease:before,.crease:after{content:"";position:absolute;inset:0;background:linear-gradient(to right,rgba(0,0,0,.55),rgba(0,0,0,0) 50%),linear-gradient(to left,rgba(0,0,0,.55),rgba(0,0,0,0) 50%);mix-blend-mode:multiply;opacity:.85;filter:blur(.4px)}
+
+    .hint{font-size:12px;opacity:.75}
+    .stage{cursor:grab}
+  .stage.dragging{cursor:grabbing}
+  .stage{cursor:grab}
+  .stage.dragging{cursor:grabbing}
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <button id="prevBtn" class="secondary">上一頁</button>
+    <button id="nextBtn">下一頁</button>
+    <button id="zoomIn">放大</button>
+    <button id="zoomOut" class="secondary">縮小</button>
+  </div>
+  <div class="hint">順序：1 封面 outer-right → 2 初開（左：inner-left｜右：outer-left） → 3 全開（inner-left / inner-center / inner-right） → 4 回初開 → 5 回封面 → 6 翻面（outer-center）。</div>
+
+  <div class="stage">
+    <div class="brochure" id="brochure" style="transform:scale(1)">
+      <div class="panel left" id="pLeft">
+        <div class="page"><img src="inner-left.jpg" alt="inner-left"></div>
+      </div>
+      <div class="panel center" id="pCenter">
+        <div class="page"><img src="inner-center.jpg" alt="inner-center"></div>
+      </div>
+      <div class="panel right" id="pRight">
+        <div class="page"><img id="rightImg" src="outer-right.jpg" alt="right"></div>
+      </div>
+
+      <div class="crease left"></div>
+      <div class="crease right"></div>
+    </div>
+  </div>
+
+  <script>
+    // 1=only outer-right, 2=inner-left+outer-left, 3=inner-left+inner-center+inner-right, 4=回初開, 5=回封面, 6=翻面 outer-center
+    let stage = 1;
+
+    const pLeft   = document.getElementById('pLeft');
+    const pCenter = document.getElementById('pCenter');
+    const pRight  = document.getElementById('pRight');
+    const rightImg = document.getElementById('rightImg');
+    const brochure = document.getElementById('brochure');
+
+    const setVis = (el, show) => el.classList.toggle('hidden', !show);
+
+    function applyStage(){
+      switch(stage){
+        case 1: // 只有 outer-right
+          rightImg.src = 'outer-right.jpg';
+          setVis(pLeft,false); setVis(pCenter,false);
+          break;
+        case 2: // 左 inner-left + 右 outer-left
+          rightImg.src = 'outer-left.jpg';
+          setVis(pLeft,true); setVis(pCenter,false);
+          break;
+        case 3: // 全開：左 inner-left + 中 inner-center + 右 inner-right
+          rightImg.src = 'inner-right.jpg';
+          setVis(pLeft,true); setVis(pCenter,true);
+          break;
+        case 4: // 回初開（同 2）
+          rightImg.src = 'outer-left.jpg';
+          setVis(pLeft,true); setVis(pCenter,false);
+          break;
+        case 5: // 回封面（同 1）
+          rightImg.src = 'outer-right.jpg';
+          setVis(pLeft,false); setVis(pCenter,false);
+          break;
+        case 6: // 翻面：outer-center
+          rightImg.src = 'outer-center.jpg';
+          setVis(pLeft,false); setVis(pCenter,false);
+          break;
+      }
+    }
+
+    document.getElementById('nextBtn').addEventListener('click',()=>{ stage = (stage===6)?1:stage+1; applyStage(); });
+    document.getElementById('prevBtn').addEventListener('click',()=>{ stage = (stage===1)?6:stage-1; applyStage(); });
+
+    // Zoom
+    let scale = 1; const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
+    function setScale(){ brochure.style.transform = `scale(${scale})`; }
+    document.getElementById('zoomIn').addEventListener('click',()=>{ scale = clamp(scale+0.1,0.8,2); setScale(); });
+    document.getElementById('zoomOut').addEventListener('click',()=>{ scale = clamp(scale-0.1,0.8,2); setScale(); });
+
+    applyStage();
+  </script>
+<script>
+// ===== Drag to pan & mouse-wheel zoom (keeps cursor point stable) =====
+(function(){
+  const stageEl = document.querySelector('.stage');
+  const brochure = document.getElementById('brochure');
+  if(!stageEl || !brochure) return;
+
+  let scale = 1, tx = 0, ty = 0;
+  const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
+  function apply(){
+    brochure.style.transformOrigin = '0 0';
+    brochure.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  }
+  function zoomAt(stageX, stageY, factor){
+    const newScale = clamp(scale * factor, 0.6, 2.5);
+    if(newScale === scale) return;
+    const worldX = (stageX - tx) / scale;
+    const worldY = (stageY - ty) / scale;
+    scale = newScale;
+    tx = stageX - worldX * scale;
+    ty = stageY - worldY * scale;
+    apply();
+  }
+
+  // Replace old zoom buttons using a capturing handler to block previous listeners
+  const zin = document.getElementById('zoomIn');
+  const zout = document.getElementById('zoomOut');
+  if(zin){ zin.addEventListener('click', (e)=>{ e.stopImmediatePropagation(); const r=stageEl.getBoundingClientRect(); zoomAt(r.width/2, r.height/2, 1.1); }, true); }
+  if(zout){ zout.addEventListener('click', (e)=>{ e.stopImmediatePropagation(); const r=stageEl.getBoundingClientRect(); zoomAt(r.width/2, r.height/2, 0.9); }, true); }
+
+  // Wheel zoom at cursor
+  stageEl.addEventListener('wheel',(e)=>{
+    e.preventDefault();
+    const rect = stageEl.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const factor = e.deltaY > 0 ? 0.9 : 1.1;
+    zoomAt(sx, sy, factor);
+  }, { passive:false });
+
+  // Mouse drag to pan
+  let dragging=false, lastX=0, lastY=0;
+  stageEl.addEventListener('mousedown',(e)=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; stageEl.classList.add('dragging'); });
+  window.addEventListener('mousemove',(e)=>{ if(!dragging) return; const dx=e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY; tx+=dx; ty+=dy; apply(); });
+  window.addEventListener('mouseup',()=>{ dragging=false; stageEl.classList.remove('dragging'); });
+
+  // Touch: one-finger pan, two-finger pinch zoom
+  let pinch = {active:false, dist:0, cx:0, cy:0};
+  stageEl.addEventListener('touchstart',(e)=>{
+    if(e.touches.length===1){ dragging=true; lastX=e.touches[0].clientX; lastY=e.touches[0].clientY; stageEl.classList.add('dragging'); }
+    else if(e.touches.length===2){
+      pinch.active=true; const [a,b]=e.touches; pinch.dist=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY); const rect=stageEl.getBoundingClientRect(); pinch.cx=((a.clientX+b.clientX)/2)-rect.left; pinch.cy=((a.clientY+b.clientY)/2)-rect.top; }
+  },{passive:true});
+  stageEl.addEventListener('touchmove',(e)=>{
+    if(e.touches.length===1 && dragging){ const t=e.touches[0]; const dx=t.clientX-lastX, dy=t.clientY-lastY; lastX=t.clientX; lastY=t.clientY; tx+=dx; ty+=dy; apply(); }
+    else if(e.touches.length===2 && pinch.active){ const [a,b]=e.touches; const nd=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY); zoomAt(pinch.cx,pinch.cy, nd/pinch.dist); pinch.dist=nd; }
+  },{passive:true});
+  stageEl.addEventListener('touchend',()=>{ dragging=false; pinch.active=false; stageEl.classList.remove('dragging'); },{passive:true});
+
+  // Double click to reset view
+  stageEl.addEventListener('dblclick',()=>{ scale=1; tx=0; ty=0; apply(); });
+
+  apply();
+})();
+</script>
+<script>
+// ===== Drag to pan & mouse-wheel zoom (keeps cursor point stable) =====
+(function(){
+  const stageEl = document.querySelector('.stage');
+  const brochure = document.getElementById('brochure');
+  if(!stageEl || !brochure) return;
+
+  let scale = 1, tx = 0, ty = 0;
+  const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
+  function apply(){
+    brochure.style.transformOrigin = '0 0';
+    brochure.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  }
+  function zoomAt(stageX, stageY, factor){
+    const newScale = clamp(scale * factor, 0.6, 2.5);
+    if(newScale === scale) return;
+    const worldX = (stageX - tx) / scale;
+    const worldY = (stageY - ty) / scale;
+    scale = newScale;
+    tx = stageX - worldX * scale;
+    ty = stageY - worldY * scale;
+    apply();
+  }
+
+  // Replace old zoom buttons using a capturing handler to block previous listeners
+  const zin = document.getElementById('zoomIn');
+  const zout = document.getElementById('zoomOut');
+  if(zin){ zin.addEventListener('click', (e)=>{ e.stopImmediatePropagation(); const r=stageEl.getBoundingClientRect(); zoomAt(r.width/2, r.height/2, 1.1); }, true); }
+  if(zout){ zout.addEventListener('click', (e)=>{ e.stopImmediatePropagation(); const r=stageEl.getBoundingClientRect(); zoomAt(r.width/2, r.height/2, 0.9); }, true); }
+
+  // Wheel zoom at cursor
+  stageEl.addEventListener('wheel',(e)=>{
+    e.preventDefault();
+    const rect = stageEl.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const factor = e.deltaY > 0 ? 0.9 : 1.1;
+    zoomAt(sx, sy, factor);
+  }, { passive:false });
+
+  // Mouse drag to pan
+  let dragging=false, lastX=0, lastY=0;
+  stageEl.addEventListener('mousedown',(e)=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; stageEl.classList.add('dragging'); });
+  window.addEventListener('mousemove',(e)=>{ if(!dragging) return; const dx=e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY; tx+=dx; ty+=dy; apply(); });
+  window.addEventListener('mouseup',()=>{ dragging=false; stageEl.classList.remove('dragging'); });
+
+  // Touch: one-finger pan, two-finger pinch zoom
+  let pinch = {active:false, dist:0, cx:0, cy:0};
+  stageEl.addEventListener('touchstart',(e)=>{
+    if(e.touches.length===1){ dragging=true; lastX=e.touches[0].clientX; lastY=e.touches[0].clientY; stageEl.classList.add('dragging'); }
+    else if(e.touches.length===2){
+      pinch.active=true; const [a,b]=e.touches; pinch.dist=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY); const rect=stageEl.getBoundingClientRect(); pinch.cx=((a.clientX+b.clientX)/2)-rect.left; pinch.cy=((a.clientY+b.clientY)/2)-rect.top; }
+  },{passive:true});
+  stageEl.addEventListener('touchmove',(e)=>{
+    if(e.touches.length===1 && dragging){ const t=e.touches[0]; const dx=t.clientX-lastX, dy=t.clientY-lastY; lastX=t.clientX; lastY=t.clientY; tx+=dx; ty+=dy; apply(); }
+    else if(e.touches.length===2 && pinch.active){ const [a,b]=e.touches; const nd=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY); zoomAt(pinch.cx,pinch.cy, nd/pinch.dist); pinch.dist=nd; }
+  },{passive:true});
+  stageEl.addEventListener('touchend',()=>{ dragging=false; pinch.active=false; stageEl.classList.remove('dragging'); },{passive:true});
+
+  // Double click to reset view
+  stageEl.addEventListener('dblclick',()=>{ scale=1; tx=0; ty=0; apply(); });
+
+  apply();
+})();
+</script>
+</body>
+</html>
